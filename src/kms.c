@@ -573,12 +573,82 @@ static void logResponse(RESPONSE* baseResponse, const BYTE *const hwId, const ch
 long long int llabs(long long int j);
 #endif
 
+#ifndef NO_WHITELISTING
+int ipstr2int(const char* ipstr, uint32_t* ip) {
+	uint8_t a, b, c, d;
+	if (sscanf(ipstr, "%hhu.%hhu.%hhu.%hhu", &a, &b, &c, &d) < 4) {
+		return -1;
+	}
+
+	*ip = (a << 24) | (b << 16) | (c << 8) | d;
+
+	return 0;
+}
+
+static HRESULT clientWhitelist(REQUEST* baseRequest, const char* ipportstr) {
+	char clientName[64];
+	ucs2_to_utf8(baseRequest->WorkstationName, clientName, 64, 64);
+
+	if (!(whitelist_ips[0].first_ip == 0 && whitelist_ips[0].final_ip == 0 && whitelist_ips[0].mask == 0)) {
+		char* ipstr_cpy = malloc(strlen(ipportstr));
+		strcpy(ipstr_cpy, ipportstr);
+
+		char* ipstr = strtok(ipstr_cpy, ":");
+
+		uint32_t ipreq;
+		if (ipstr2int(ipstr, &ipreq) < 0) {
+			free(ipstr_cpy);
+			logger("Client '%s' failed to parse IP '%s', access denied\n", clientName, ipportstr);
+			return 0x80070005;
+		}
+		free(ipstr_cpy);
+
+		size_t i = 0;
+		while (!(whitelist_ips[i].first_ip == 0 && whitelist_ips[i].final_ip == 0 && whitelist_ips[i].mask == 0)) {
+			if (whitelist_ips[i].first_ip <= ipreq && whitelist_ips[i].final_ip >= ipreq)
+				return 0;
+			i = i + 1;
+		}
+
+		if (whitelist_hosts_file == NULL) {
+			logger("Client '%s' using IP '%s' is not in whitelist, access denied\n", clientName, ipportstr);
+			return 0x80070005;
+		}
+	}
+
+	if (whitelist_hosts_file != NULL) {
+		FILE *fp = fopen(whitelist_hosts_file, "r");
+		if (fp == NULL)
+			return 0;
+
+		char *line = NULL;
+		size_t len = 0;
+		ssize_t read;
+
+		while ((read = getline(&line, &len, fp)) != -1) {
+			if (line[read - 1] == '\n')
+				line[read - 1] = 0;
+
+			if (strcmp(clientName, line) == 0) {
+				fclose(fp);
+				return 0;
+			}
+		}
+
+		fclose(fp);
+		logger("Client '%s' is not in allowed host list, access denied\n", clientName);
+		return 0x80070005;
+	}
+
+	return 0;
+}
+#endif // NO_WHITELISTING
 
 /*
  * Creates the unencrypted base response
  */
 #ifndef IS_LIBRARY
-static HRESULT __stdcall CreateResponseBaseCallback(REQUEST* baseRequest, RESPONSE *const baseResponse, BYTE *const hwId, const char* const ipstr_unused)
+static HRESULT __stdcall CreateResponseBaseCallback(REQUEST* baseRequest, RESPONSE *const baseResponse, BYTE *const hwId, const char* const ipstr)
 {
 	const char* EpidSource;
 #ifndef NO_LOG
@@ -587,6 +657,12 @@ static HRESULT __stdcall CreateResponseBaseCallback(REQUEST* baseRequest, RESPON
 	CheckRequest(baseRequest);
 #endif // _PEDANTIC
 #endif // NO_LOG
+
+#ifndef NO_WHITELISTING
+	HRESULT allowed = clientWhitelist(baseRequest, ipstr);
+	if (allowed != 0)
+		return allowed;
+#endif // NO_WHITELISTING
 
 	char* ePid;
 	const DWORD minClients = LE32(baseRequest->N_Policy);

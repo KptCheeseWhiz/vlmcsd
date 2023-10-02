@@ -392,4 +392,13 @@ typedef struct {
 #define vlmcsd_unlink unlink
 #endif  // !_MSC_VER
 
+#ifndef NO_WHITELISTING
+typedef struct WhitelistIP {
+	uint32_t ip;
+	uint32_t mask;
+	uint32_t first_ip;
+	uint32_t final_ip;
+} WhitelistIP_t, *PWhitelistIP_t;
+#endif // NO_WHITELISTING
+
 #endif // __types_h

@@ -84,7 +84,7 @@
 #include "wintap.h"
 #endif
 
-static const char* const optstring = "a:N:B:m:t:A:R:u:g:L:p:i:H:P:l:r:U:W:C:c:F:O:o:x:T:K:E:M:j:SseDdVvqkZ";
+static const char* const optstring = "a:N:B:m:t:A:R:u:g:L:p:i:H:P:l:r:U:W:C:c:F:O:o:x:T:K:E:M:j:Y:y:SseDdVvqkZ";
 
 #if !defined(NO_SOCKETS) && !defined(USE_MSRPC) && !defined(SIMPLE_SOCKETS)
 static uint_fast8_t maxsockets = 0;
@@ -188,6 +188,10 @@ static IniFileParameter_t IniFileParameterList[] =
 #	if !defined(NO_PRIVATE_IP_DETECT)
 		{"PublicIPProtectionLevel", INI_PARAM_PUBLIC_IP_PROTECTION_LEVEL },
 #	endif
+# ifndef NO_WHITELISTING
+		{ "WhitelistIPs", INI_PARAM_WHITELIST_IPS },
+		{ "WhitelistHostsFile", INI_PARAM_WHITELIST_HOSTS_FILE }
+# endif // NO_WHITELISTING
 };
 
 #endif // NO_INI_FILE
@@ -365,6 +369,10 @@ static __noreturn void usage()
 #		endif // _WIN32
 		"  -l <file>\t\tlog to <file>\n"
 		"  -T0, -T1\t\tdisable/enable logging with time and date (default -T1)\n"
+#   ifndef NO_WHITELISTING
+		"  -Y <CIDRs>\t\tList of CIDR to bypass hostname whitelist\n"
+		"  -y <file>\t\tWhitelist hosts file with one entry on each line\n"
+#   endif // NO_WHITELISTING
 #		ifndef NO_VERBOSE_LOG
 		"  -v\t\t\tlog verbose\n"
 		"  -q\t\t\tdon't log verbose (default)\n"
@@ -726,6 +734,37 @@ static BOOL setIniFileParameter(uint_fast8_t id, const char* const iniarg)
 		break;
 
 #	endif // !defined(NO_PRIVATE_IP_DETECT)
+
+# ifndef NO_WHITELISTING
+	case INI_PARAM_WHITELIST_IPS:
+		char* whitelist_ip_str = vlmcsd_strdup(iniarg);
+
+		size_t i = 0;
+		char* whitelist_ip = strtok(whitelist_ip_str, ",");
+		while (whitelist_ip != NULL && i < 31) {
+			uint8_t a, b, c, d, bits;
+			if (sscanf(whitelist_ip, "%hhu.%hhu.%hhu.%hhu/%hhu", &a, &b, &c, &d, &bits) < 5 || bits > 32) {
+				printf("Invalid CIDR '%s' in options\n", whitelist_ip);
+				exit(1);
+			}
+
+			struct WhitelistIP wli;
+			wli.ip = (a << 24UL) | (b << 16UL) | (c << 8UL) | d;
+			wli.mask = (0xFFFFFFFFUL << (32UL - bits)) & 0xFFFFFFFFUL;
+			wli.first_ip = wli.ip & wli.mask;
+			wli.final_ip = wli.first_ip | ~wli.mask;
+
+			whitelist_ips[i] = wli;
+
+			whitelist_ip = strtok(NULL, ",");
+			i = i + 1;
+		}
+		break;
+
+	case INI_PARAM_WHITELIST_HOSTS_FILE:
+		whitelist_hosts_file = vlmcsd_strdup(iniarg);
+		break;
+# endif // NO_WHITELISTING
 
 	default:
 		return FALSE;
@@ -1411,6 +1450,37 @@ static void parseGeneralArguments() {
 		exit(0);
 #	endif // NO_VERSION_INFORMATION
 
+# ifndef NO_WHITELISTING
+	case 'Y':
+		char* whitelist_ips_str = getCommandLineArg(optarg);
+
+		size_t i = 0;
+		char* whitelist_ip = strtok(whitelist_ips_str, ",");
+		while (whitelist_ip != NULL && i < 31) {
+			uint8_t a, b, c, d, bits;
+			if (sscanf(whitelist_ip, "%hhu.%hhu.%hhu.%hhu/%hhu", &a, &b, &c, &d, &bits) < 5 || bits > 32) {
+				printf("Invalid CIDR '%s' in options\n", whitelist_ip);
+				exit(1);
+			}
+
+			struct WhitelistIP wli;
+			wli.ip = (a << 24UL) | (b << 16UL) | (c << 8UL) | d;
+			wli.mask = (0xFFFFFFFFUL << (32UL - bits)) & 0xFFFFFFFFUL;
+			wli.first_ip = wli.ip & wli.mask;
+			wli.final_ip = wli.first_ip | ~wli.mask;
+			whitelist_ips[i] = wli;
+			
+			whitelist_ip = strtok(NULL, ",");
+			i = i + 1;
+		}
+
+		ignoreIniFileParameter(INI_PARAM_WHITELIST_IPS);
+		break;
+	case 'y':
+		whitelist_hosts_file = getCommandLineArg(optarg);
+		ignoreIniFileParameter(INI_PARAM_WHITELIST_HOSTS_FILE);
+		break;
+# endif // NO_WHITELISTING
 	default:
 		usage();
 	}

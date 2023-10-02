@@ -149,6 +149,11 @@ CRITICAL_SECTION logmutex;
 int_fast8_t freebind = FALSE;
 #endif // HAVE_FREEBIND
 
+#ifndef NO_WHITELISTING
+char *whitelist_hosts_file;
+WhitelistIP_t whitelist_ips[32];
+#endif // NO_WHITELISTING
+
 
 
 

@@ -408,3 +408,8 @@ uint32_t IsValidHostBuild(const int32_t hostBuild);
 #endif // _PEDANTIC
 
 #endif // __kms_h
+
+#ifndef NO_WHITELISTING
+extern WhitelistIP_t whitelist_ips[32];
+extern char* whitelist_hosts_file;
+#endif // NO_WHITELISTING
