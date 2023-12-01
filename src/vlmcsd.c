@@ -739,12 +739,14 @@ static BOOL setIniFileParameter(uint_fast8_t id, const char* const iniarg)
 	case INI_PARAM_WHITELIST_IPS:
 		char* whitelist_ip_str = vlmcsd_strdup(iniarg);
 
-		size_t i = 0;
+		size_t ip_index = 0;
 		char* whitelist_ip = strtok(whitelist_ip_str, ",");
-		while (whitelist_ip != NULL && i < 31) {
+		while (whitelist_ip != NULL && ip_index < MAX_WHITELIST_SIZE) {
 			uint8_t a, b, c, d, bits;
 			if (sscanf(whitelist_ip, "%hhu.%hhu.%hhu.%hhu/%hhu", &a, &b, &c, &d, &bits) < 5 || bits > 32) {
-				printf("Invalid CIDR '%s' in options\n", whitelist_ip);
+				#	ifndef NO_LOG
+				logger("Error: Invalid CIDR '%s' in options.\n", whitelist_ip);
+				#	endif // NO_LOG
 				exit(1);
 			}
 
@@ -754,15 +756,38 @@ static BOOL setIniFileParameter(uint_fast8_t id, const char* const iniarg)
 			wli.first_ip = wli.ip & wli.mask;
 			wli.final_ip = wli.first_ip | ~wli.mask;
 
-			whitelist_ips[i] = wli;
+			whitelist_ips[ip_index] = wli;
 
 			whitelist_ip = strtok(NULL, ",");
-			i = i + 1;
+			ip_index = ip_index + 1;
 		}
 		break;
 
 	case INI_PARAM_WHITELIST_HOSTS_FILE:
-		whitelist_hosts_file = vlmcsd_strdup(iniarg);
+		char *whitelist_hosts_file = vlmcsd_strdup(iniarg);
+
+		FILE *fp = fopen(whitelist_hosts_file, "r");
+		if (fp == NULL) {
+			#	ifndef NO_LOG
+			logger("Warning: Unable to open whitelist hosts file '%s'.\n", whitelist_hosts_file);
+			#	endif // NO_LOG
+			break;
+		}
+
+		char *line = NULL;
+		size_t host_index = 0;
+		size_t len = 0;
+		ssize_t read;
+
+		while ((read = getline(&line, &len, fp)) != -1 && host_index < MAX_WHITELIST_SIZE) {
+			if (line[read - 1] == '\n')
+				line[read - 1] = 0;
+			strcpy(whitelist_hosts[host_index], line);
+			host_index = host_index + 1;
+		}
+
+		fclose(fp);
+
 		break;
 # endif // NO_WHITELISTING
 
@@ -1454,12 +1479,14 @@ static void parseGeneralArguments() {
 	case 'Y':
 		char* whitelist_ips_str = getCommandLineArg(optarg);
 
-		size_t i = 0;
+		size_t ip_index = 0;
 		char* whitelist_ip = strtok(whitelist_ips_str, ",");
-		while (whitelist_ip != NULL && i < 31) {
+		while (whitelist_ip != NULL && ip_index < MAX_WHITELIST_SIZE) {
 			uint8_t a, b, c, d, bits;
 			if (sscanf(whitelist_ip, "%hhu.%hhu.%hhu.%hhu/%hhu", &a, &b, &c, &d, &bits) < 5 || bits > 32) {
-				printf("Invalid CIDR '%s' in options\n", whitelist_ip);
+				#	ifndef NO_LOG
+				logger("Error: Invalid CIDR '%s' in options.\n", whitelist_ip);
+				#	endif // NO_LOG
 				exit(1);
 			}
 
@@ -1468,16 +1495,40 @@ static void parseGeneralArguments() {
 			wli.mask = (0xFFFFFFFFUL << (32UL - bits)) & 0xFFFFFFFFUL;
 			wli.first_ip = wli.ip & wli.mask;
 			wli.final_ip = wli.first_ip | ~wli.mask;
-			whitelist_ips[i] = wli;
+			whitelist_ips[ip_index] = wli;
 			
 			whitelist_ip = strtok(NULL, ",");
-			i = i + 1;
+			ip_index = ip_index + 1;
 		}
 
 		ignoreIniFileParameter(INI_PARAM_WHITELIST_IPS);
 		break;
 	case 'y':
-		whitelist_hosts_file = getCommandLineArg(optarg);
+		char* whitelist_hosts_file = getCommandLineArg(optarg);
+
+		FILE *fp = fopen(whitelist_hosts_file, "r");
+		if (fp == NULL) {
+			#	ifndef NO_LOG
+			logger("Warning: Unable to open whitelist hosts file '%s'.\n", whitelist_hosts_file);
+			#	endif // NO_LOG
+			ignoreIniFileParameter(INI_PARAM_WHITELIST_HOSTS_FILE);
+			break;
+		}
+
+		char *line = NULL;
+		size_t host_index = 0;
+		size_t len = 0;
+		ssize_t read;
+
+		while ((read = getline(&line, &len, fp)) != -1 && host_index < MAX_WHITELIST_SIZE) {
+			if (line[read - 1] == '\n')
+				line[read - 1] = 0;
+			strcpy(whitelist_hosts[host_index], line);
+			host_index = host_index + 1;
+		}
+
+		fclose(fp);
+
 		ignoreIniFileParameter(INI_PARAM_WHITELIST_HOSTS_FILE);
 		break;
 # endif // NO_WHITELISTING

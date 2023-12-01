@@ -410,6 +410,6 @@ uint32_t IsValidHostBuild(const int32_t hostBuild);
 #endif // __kms_h
 
 #ifndef NO_WHITELISTING
-extern WhitelistIP_t whitelist_ips[32];
-extern char* whitelist_hosts_file;
+extern WhitelistIP_t whitelist_ips[MAX_WHITELIST_SIZE];
+extern char whitelist_hosts[MAX_WHITELIST_SIZE][128];
 #endif // NO_WHITELISTING

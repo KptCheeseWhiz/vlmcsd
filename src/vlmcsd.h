@@ -14,8 +14,8 @@ extern char *fn_log;
 #include "types.h"
 
 #ifndef NO_WHITELISTING
-extern char *whitelist_hosts_file;
-extern WhitelistIP_t whitelist_ips[];
+extern char whitelist_hosts[MAX_WHITELIST_SIZE][128];
+extern WhitelistIP_t whitelist_ips[MAX_WHITELIST_SIZE];
 #endif // NO_WHITELISTING 
 
 //int main(int argc, CARGV);

@@ -667,6 +667,14 @@
 #endif // SIMPLE_SOCKETS
 
 
+#ifndef NO_WHITELISTING
+/*
+ * Disables the IP and hostname whitelisting functionalities
+ */
+#define MAX_WHITELIST_SIZE 32
+
+#endif // NO_WHITELISTING
+
 
 /* Don't change anything BELOW this line */
 

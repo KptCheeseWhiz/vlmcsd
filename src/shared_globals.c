@@ -150,8 +150,8 @@ int_fast8_t freebind = FALSE;
 #endif // HAVE_FREEBIND
 
 #ifndef NO_WHITELISTING
-char *whitelist_hosts_file;
-WhitelistIP_t whitelist_ips[32];
+char whitelist_hosts[MAX_WHITELIST_SIZE][128];
+WhitelistIP_t whitelist_ips[MAX_WHITELIST_SIZE];
 #endif // NO_WHITELISTING
 
 

@@ -603,39 +603,28 @@ static HRESULT clientWhitelist(REQUEST* baseRequest, const char* ipportstr) {
 		}
 		free(ipstr_cpy);
 
-		size_t i = 0;
-		while (!(whitelist_ips[i].first_ip == 0 && whitelist_ips[i].final_ip == 0 && whitelist_ips[i].mask == 0)) {
-			if (whitelist_ips[i].first_ip <= ipreq && whitelist_ips[i].final_ip >= ipreq)
+		size_t ip_index = 0;
+		while (!(whitelist_ips[ip_index].first_ip == 0 && whitelist_ips[ip_index].final_ip == 0 && whitelist_ips[ip_index].mask == 0) && ip_index < MAX_WHITELIST_SIZE) {
+			if (whitelist_ips[ip_index].first_ip <= ipreq && whitelist_ips[ip_index].final_ip >= ipreq)
 				return 0;
-			i = i + 1;
+			ip_index = ip_index + 1;
 		}
 
-		if (whitelist_hosts_file == NULL) {
+		if (whitelist_hosts[0][0] == 0) {
 			logger("Client '%s' using IP '%s' is not in whitelist, access denied\n", clientName, ipportstr);
 			return 0x80070005;
 		}
 	}
 
-	if (whitelist_hosts_file != NULL) {
-		FILE *fp = fopen(whitelist_hosts_file, "r");
-		if (fp == NULL)
-			return 0;
-
-		char *line = NULL;
-		size_t len = 0;
-		ssize_t read;
-
-		while ((read = getline(&line, &len, fp)) != -1) {
-			if (line[read - 1] == '\n')
-				line[read - 1] = 0;
-
-			if (strcmp(clientName, line) == 0) {
-				fclose(fp);
+	if (whitelist_hosts[0][0] != 0) {
+		size_t host_index = 0;
+		while (whitelist_hosts[host_index][0] != 0 && host_index < MAX_WHITELIST_SIZE) {
+			if (strcmp(whitelist_hosts[host_index], clientName) == 0) {
 				return 0;
 			}
+			host_index = host_index + 1;
 		}
 
-		fclose(fp);
 		logger("Client '%s' is not in allowed host list, access denied\n", clientName);
 		return 0x80070005;
 	}
